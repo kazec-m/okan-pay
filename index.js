@@ -19,7 +19,7 @@ const client = new line.messagingApi.MessagingApiClient(config);
 
 // sunabar(銀行API)のアクセストークン(環境変数から取得)
 const sunabarToken = process.env.sunabarToken; // 親の振込用
-const sunabarToken_CHILD = process.env.sunabarToken_CHILD; // 子どもの残高照会用（ゆみゆみさん設定）
+const sunabarToken_CHILD = process.env.sunabarToken_CHILD; // 子どもの残高照会用(ゆみゆみさん設定)
 
 // 親・子どものLINEユーザーID(環境変数から取得)
 const PARENT_USER_ID = process.env.PARENT_USER_ID;
@@ -37,7 +37,7 @@ exports.handler = async (event) => {
     // LINEから送られてきたデータを取り出す
     const body = JSON.parse(event.body);
 
-    // 🛡️ LINEの「検証」ボタン・空イベント対策（エラーになる前にここで即終了する）
+    // 🛡️ LINEの「検証」ボタン・空イベント対策(エラーになる前にここで即終了する)
     if (!body.events || body.events.length === 0) {
       return { statusCode: 200, body: "OK" };
     }
@@ -143,12 +143,12 @@ exports.handler = async (event) => {
           });
         } else {
           // ---------- 79点以下の場合(ボーナスなし) ----------
-          resMessage = "送金保留!!!お小遣いは自宅待機中です!";
 
-          const childMessage1 =
-            "😅 う〜ん、今回は厳しめ採点しちゃうよ!\n" +
-            score +
-            "点か〜、次は期待してるからね!\n今回はボーナスなし、また頑張ろう!";
+          // 親への返信メッセージ
+          resMessage = "送金保留します";
+
+          // 子どもへの通知メッセージ
+          const childMessage1 = "送金保留!!!お小遣いは自宅待機中です!";
           const childMessage2 = "「残高」と送ると、今の貯金額を確認できるよ";
 
           await client.pushMessage({
@@ -197,10 +197,10 @@ exports.handler = async (event) => {
         stageName = "ひよこ";
       }
 
-      resMessage = `いまの残高は ${formattedBalance} 円だよ！\n現在の成長ステージ：【${stageName} ${character}】`;
+      resMessage = `いまの残高は ${formattedBalance} 円だよ!\n現在の成長ステージ:【${stageName} ${character}】`;
     } else {
       // 「点」でも「残高」でもない日常会話のとき
-      resMessage = `「${reqMessage}」だね！「残高」って送るか、「92点」みたいに点数を送ってみてね。`;
+      resMessage = `「${reqMessage}」だね!「残高」って送るか、「92点」みたいに点数を送ってみてね。`;
     }
 
     // LINEに親への返信を送る
