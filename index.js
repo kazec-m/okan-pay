@@ -51,7 +51,6 @@ export const handler = async (event) => {
         if (bonusAmount > 0) {
           const today = new Date().toISOString().split("T")[0];
 
-          // 銀行振込APIをfetchで叩く
           const response = await fetch(
             "https://api.sunabar.gmo-aozora.com/personal/v1/transfer/request",
             {
@@ -83,10 +82,8 @@ export const handler = async (event) => {
           );
           const data = await response.json();
 
-          // 親への返信内容を設定
           resMessage = `${score}点!ボーナス${bonusAmount}円を即時振込しました(受付番号: ${data.applyNo || "なし"})`;
 
-          // 子どもへの通知メッセージ作成
           let childMessage1 = "";
           if (score === 100) {
             childMessage1 =
@@ -98,7 +95,6 @@ export const handler = async (event) => {
           }
           const childMessage2 = "「残高」と送ると、今の貯金額を確認できるよ";
 
-          // 子どもへのLINE Push送信
           await fetch("https://api.line.me/v2/bot/message/push", {
             method: "POST",
             headers: {
@@ -115,9 +111,9 @@ export const handler = async (event) => {
           });
         } else {
           // ---------- 79点以下の場合(ボーナスなし) ----------
-          resMessage = "送金保留!!!お小遣いは自宅待機中です!";
+          resMessage = "送金保留します";
 
-          const childMessage1 = `😅 う〜ん、今回は厳しめ採点しちゃうよ!\n${score}点か〜、次は期待してるからね!\n今回はボーナスなし、また頑張ろう!`;
+          const childMessage1 = "送金保留!!!お小遣いは自宅待機中です!";
           const childMessage2 = "「残高」と送ると、今の貯金額を確認できるよ";
 
           await fetch("https://api.line.me/v2/bot/message/push", {
@@ -140,32 +136,198 @@ export const handler = async (event) => {
       }
 
       // ===========================================
+      // ★新規追加ゾーン: 「金額表」と送られたら、フレックスメッセージで金額表を返す
+      // ===========================================
+    } else if (reqMessage === "金額表") {
+      await fetch("https://api.line.me/v2/bot/message/reply", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.channelAccessTokenLINE}`,
+        },
+        body: JSON.stringify({
+          replyToken: replyToken,
+          messages: [
+            {
+              type: "flex",
+              altText: "オカンPay ボーナス金額表",
+              contents: {
+                type: "bubble",
+                size: "kilo",
+                header: {
+                  type: "box",
+                  layout: "vertical",
+                  backgroundColor: "#FF6B6B",
+                  paddingAll: "md",
+                  contents: [
+                    {
+                      type: "text",
+                      text: "オカンPay ボーナス金額表",
+                      color: "#FFFFFF",
+                      weight: "bold",
+                      size: "md",
+                      align: "center",
+                      wrap: true,
+                    },
+                  ],
+                },
+                body: {
+                  type: "box",
+                  layout: "vertical",
+                  spacing: "md",
+                  contents: [
+                    {
+                      type: "box",
+                      layout: "horizontal",
+                      contents: [
+                        { type: "text", text: "💮 100点", size: "md", flex: 3 },
+                        {
+                          type: "text",
+                          text: "1,500円",
+                          size: "md",
+                          align: "end",
+                          weight: "bold",
+                          flex: 2,
+                        },
+                      ],
+                    },
+                    {
+                      type: "box",
+                      layout: "horizontal",
+                      contents: [
+                        {
+                          type: "text",
+                          text: "🌸 90〜99点",
+                          size: "md",
+                          flex: 3,
+                        },
+                        {
+                          type: "text",
+                          text: "900円",
+                          size: "md",
+                          align: "end",
+                          weight: "bold",
+                          flex: 2,
+                        },
+                      ],
+                    },
+                    {
+                      type: "box",
+                      layout: "horizontal",
+                      contents: [
+                        {
+                          type: "text",
+                          text: "🌸 80〜89点",
+                          size: "md",
+                          flex: 3,
+                        },
+                        {
+                          type: "text",
+                          text: "800円",
+                          size: "md",
+                          align: "end",
+                          weight: "bold",
+                          flex: 2,
+                        },
+                      ],
+                    },
+                    {
+                      type: "box",
+                      layout: "horizontal",
+                      contents: [
+                        {
+                          type: "text",
+                          text: "👻 79点以下",
+                          size: "md",
+                          flex: 3,
+                        },
+                        {
+                          type: "text",
+                          text: "送金保留",
+                          size: "md",
+                          align: "end",
+                          weight: "bold",
+                          flex: 2,
+                        },
+                      ],
+                    },
+                    { type: "separator", margin: "md" },
+                    {
+                      type: "text",
+                      text: "がんばってー!!",
+                      align: "center",
+                      weight: "bold",
+                      color: "#FF6B6B",
+                      margin: "md",
+                    },
+                  ],
+                },
+              },
+            },
+          ],
+        }),
+      });
+      return { statusCode: 200, body: "OK" };
+
+      // ===========================================
       // ★B担当ゾーン（ゆみゆみさん）: 残高照会
+      // 親なら親子両方、子どもなら子どもの残高のみ表示
       // ===========================================
     } else if (reqMessage === "残高") {
-      const sunabarResponse = await fetch(
-        "https://api.sunabar.gmo-aozora.com/personal/v1/accounts/balances",
-        {
-          method: "GET",
-          headers: { "x-access-token": sunabarToken_CHILD },
-        },
-      );
-      const sunabarData = await sunabarResponse.json();
+      if (userId === PARENT_USER_ID) {
+        // ---------- 親の場合: 親と子、両方の残高を表示 ----------
+        const parentResponse = await fetch(
+          "https://api.sunabar.gmo-aozora.com/personal/v1/accounts/balances",
+          {
+            method: "GET",
+            headers: { "x-access-token": sunabarToken },
+          },
+        );
+        const parentData = await parentResponse.json();
+        const parentBalance = Number(parentData.spAccountBalances[0].odBalance);
 
-      const balance = Number(sunabarData.spAccountBalances[0].odBalance);
-      const formattedBalance = balance.toLocaleString();
+        const childResponse = await fetch(
+          "https://api.sunabar.gmo-aozora.com/personal/v1/accounts/balances",
+          {
+            method: "GET",
+            headers: { "x-access-token": sunabarToken_CHILD },
+          },
+        );
+        const childData = await childResponse.json();
+        const childBalance = Number(childData.spAccountBalances[0].odBalance);
 
-      let character = "🥚";
-      let stageName = "たまご";
-      if (balance >= 5000) {
-        character = "👑";
-      } else if (balance >= 3000) {
-        character = "🐔";
-      } else if (balance >= 1000) {
-        character = "🐣";
+        resMessage = `【親】残高: ${parentBalance.toLocaleString()}円\n【子ども】残高: ${childBalance.toLocaleString()}円`;
+      } else if (userId === CHILD_USER_ID) {
+        // ---------- 子どもの場合: 子どもの残高のみ表示(ひよこ育成つき) ----------
+        const sunabarResponse = await fetch(
+          "https://api.sunabar.gmo-aozora.com/personal/v1/accounts/balances",
+          {
+            method: "GET",
+            headers: { "x-access-token": sunabarToken_CHILD },
+          },
+        );
+        const sunabarData = await sunabarResponse.json();
+
+        const balance = Number(sunabarData.spAccountBalances[0].odBalance);
+        const formattedBalance = balance.toLocaleString();
+
+        let character = "🥚";
+        let stageName = "たまご";
+        if (balance >= 5000) {
+          character = "👑";
+          stageName = "キングにわとり";
+        } else if (balance >= 3000) {
+          character = "🐔";
+          stageName = "にわとり";
+        } else if (balance >= 1000) {
+          character = "🐣";
+          stageName = "ひよこ";
+        }
+
+        resMessage = `いまの残高は ${formattedBalance} 円だよ！\n現在の成長ステージ：【${stageName} ${character}】`;
+      } else {
+        resMessage = "権限がありません";
       }
-
-      resMessage = `いまの残高は ${formattedBalance} 円だよ！ ${character}`;
     } else {
       resMessage = `「${reqMessage}」だね！「残高」って送るか、「92点」みたいに点数を送ってみてね。`;
     }
